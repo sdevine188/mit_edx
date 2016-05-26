@@ -64,6 +64,7 @@ opt.cut = function(perf, pred){
                 c(sensitivity = y[[ind]], specificity = 1-x[[ind]], 
                   cutoff = p[[ind]])
         }, perf@x.values, perf@y.values, pred@cutoffs)
+        print(cut.ind)
 }
 print(opt.cut(m2_plot, m2_pred))
 
@@ -185,6 +186,28 @@ opt.cut = function(perf, pred){
 opt.cut(m1_perf, m1_train_prediction)
 # .6655 is optimal cut maximizing combination of tpr and tnr
 
-# test accuracy on training using this optimal cutpoint
+# get accuracy on training using this optimal cutpoint
 train$pred <- ifelse(m1_train_pred > .6655, 1, 0)
 confusionMatrix(train$pred, train$Republican) # 96% accuracy vs 94% smart baseline
+
+# get accuracy on test data
+test$pred <- predict(m1, newdata = test, type = "response")
+test$pred <- ifelse(test$pred > .6655, 1, 0)
+confusionMatrix(test$pred, test$Republican) # actually does better on test, 97.7%
+
+
+# new model with surveyUSA and DiffCount, because they are relatively less correlated with each other
+m2 <- glm(Republican ~ SurveyUSA + DiffCount, data = train)
+summary(m2)
+m2_pred <- predict(m2, train, type = "response")
+m2_pred <- ifelse(m2_pred > .5, 1, 0)
+confusionMatrix(m2_pred, train$Republican) # 97%
+
+# test model2 on test set
+m2_pred_test <- predict(m2, test, type = "response")
+m2_pred_test <- ifelse(m2_pred_test > .5, 1, 0)
+confusionMatrix(m2_pred_test, test$Republican) # 97.7%
+
+# check testing smart baseline
+table(sign(test$Rasmussen), test$Republican)
+(18 + 21) / (18 + 2 + 4 + 21) # .8666667%
