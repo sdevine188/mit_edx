@@ -1,4 +1,4 @@
-library(dplyr)
+sd(c(5,8,12))library(dplyr)
 library(stringr)
 library(readr)
 library(lubridate)

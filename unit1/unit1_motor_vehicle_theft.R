@@ -10,6 +10,7 @@ list.files()
 
 # load mvtweek1, motor vehicle theft in chicago
 mvt <- read_csv("mvtWeek1.csv")
+glimpse(mvt)
 dim(mvt)
 max(mvt$ID)
 head(mvt)
@@ -30,14 +31,25 @@ mvt$Month = months(DateConvert)
 mvt$Weekday = weekdays(DateConvert)
 mvt$Date = DateConvert
 
-mvt %>% group_by(Month) %>% summarize(mvt_count = sum(Arrest)) %>% filter(mvt_count == max(mvt_count)) 
+mvt %>% group_by(Year, Month) %>% summarize(mvt_count = sum(Arrest)) %>% arrange(mvt_count) %>% data.frame(.)
+table(mvt$Month)
 mvt %>% group_by(Month) %>% summarize(obs_count = n()) %>% filter(obs_count == min(obs_count))
 mvt %>% group_by(Weekday) %>% summarize(obs_count = n()) %>% filter(obs_count == max(obs_count))
+mvt %>% group_by(Month) %>% summarize(mvt_count = sum(Arrest)) %>% arrange(desc(mvt_count)) %>% data.frame(.)
+
 
 hist(mvt$Date, breaks=100)
-mvt %>% filter(Arrest == TRUE) %>% ggplot(aes(x = Arrest, y = Date)) + geom_boxplot()
+mvt %>% mutate(period = case_when(.$Year < 2007 ~ 1, .$Year > 2006 ~ 2)) %>% 
+        filter(Arrest == TRUE) %>% ggplot(aes(x = period, y = Arrest)) + geom_boxplot()
+mvt %>% filter(Year < 2007) %>% 
+        summarize(thefts = n(), arrests = sum(Arrest), pct_arrests = arrests / thefts)
+
+mvt %>% filter(Year > 2006) %>% 
+        summarize(thefts = n(), arrests = sum(Arrest), pct_arrests = arrests / thefts)
+
 mvt %>% filter(Year == 2012) %>% 
         summarize(thefts = n(), arrests = sum(Arrest), pct_arrests = arrests / thefts)
+
 
 names(mvt)
 head(mvt)
