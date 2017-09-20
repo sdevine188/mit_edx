@@ -4,6 +4,7 @@ library(readr)
 library(corrplot)
 library(lubridate)
 library(zoo)
+library(ggpairs)
 
 # edx MIT unit 2
 setwd("C:/Users/Stephen/Desktop/R/mit_edx/unit2")
@@ -17,6 +18,8 @@ head(wine)
 m1 <- lm(Price ~ HarvestRain + WinterRain, data = wine)
 summary(m1)
 
+
+##################################################
 
 
 # read in flu data
@@ -72,9 +75,14 @@ flu_test$ili_lag2[2] <- flu$ILI[417]
 
 flu_test$rmse <- sqrt(mean((flu_test$ILI - flu_test$exp_pred)^2))
 
+
+###############################################################
+
+
 # read in climate data
 list.files()
 cc <- read_csv("climate_change.csv")
+head(cc)
 
 # rename CFC variables because they cause issue with lm function
 names(cc)[which(grepl("CFC-11", names(cc)))] <- "cfc_11"
@@ -91,6 +99,7 @@ summary(m1)
 # correlation of train
 train_cor <- cor(train)
 corrplot(train_cor, method = "circle")
+ggpairs(train)
 
 # simpler model, bc N2O is insignificant and negative in m1
 m2 <- lm(Temp ~ MEI + TSI + Aerosols + N2O, data = train)
@@ -104,20 +113,51 @@ summary(step)
 step_pred <- predict(step, test)
 test_pred <- cbind(test, step_pred)
 test_pred$error <- test_pred$Temp - test_pred$step_pred
+
+# this is incorrect
 test_pred %>% summarize(ESS = sum((test_pred$step_pred - mean(test_pred$Temp))^2),
-                        RSS = sum((test_pred$step_pred - test_pred$Temp)^2),
-                        TSS = ESS + RSS, Rsquared = ESS / TSS)
+                        ESS2 = sum((test_pred$step_pred - mean(train$Temp))^2),
+                        RSS = sum((test_pred$Temp - test_pred$step_pred)^2),
+                        TSS = sum((test_pred$Temp - mean(train$Temp))^2),
+                        Rsquared1 = 1 - (RSS / TSS))
 
+test_pred_sum <- test_pred %>% mutate(mean_train_temp = mean(train$Temp), tss = Temp - mean_train_temp, rss = Temp - step_pred,
+                     ess1 = tss - rss, ess2 = step_pred - mean_train_temp, ess_plus_rss = ess1 + rss,
+                     tss_squared = tss^2, rss_squared = rss^2,
+                     ess1_squared = ess1^2, ess2_squared = ess2^2, 
+                     ess2_sq_plus_rss_sq = ess2_squared + rss_squared) %>% 
+        select(Temp, step_pred, mean_train_temp, tss, rss, ess1, ess2, ess_plus_rss, tss_squared, rss_squared, ess1_squared,
+               ess2_squared, ess2_sq_plus_rss_sq) %>% summarize(tss_sum = sum(tss_squared), rss_sum = sum(rss_squared),
+                                           ess1_sum = sum(ess1_squared), ess2_sum = sum(ess2_squared))
+
+test_pred_sum %>% summarize()
+
+#Explanation
+#The R code to calculate the R-squared can be written as follows (your variable names may be different):
+tempPredict = predict(step, newdata = test)
 SSE = sum((tempPredict - test$Temp)^2)
-
 SST = sum( (mean(train$Temp) - test$Temp)^2)
+R2 = 1 - SSE/SST
+
+# my calculations
+# i don't know why i can't calculate ESS directly, but only get right answer when i back it out of R2*TSS
+SST - SSE
+ESS = R2*SST
+ESS / SST
+SSE
+SST
+ESS
+R2
+ESS + SSE
 
 
-
+###########################################################################
 
 
 # education pisa data
+setwd("C:/Users/Stephen/Desktop/R/mit_edx/unit2")
 list.files()
+
 pisa_train <- data.frame(read_csv("pisa2009train.csv"))
 pisa_test <- data.frame(read_csv("pisa2009test.csv"))
 head(pisa_train)
@@ -135,6 +175,9 @@ pisa_test <- na.omit(pisa_test)
 dim(pisa_train)
 dim(pisa_test)
 str(pisa_train)
+pisa_train %>% count(male)
+pisa_train %>% count(grade)
+pisa_train %>% count(raceeth)
 
 pisa_train$raceeth <- relevel(factor(pisa_train$raceeth), "White")
 pisa_test$raceeth <- relevel(factor(pisa_test$raceeth), "White")
@@ -146,13 +189,18 @@ pisa_train_pred <- predict(m1, pisa_train)
 pisa_train_m1 <- data.frame(readingScore = pisa_train$readingScore, pred = pisa_train_pred)
 pisa_train_rmse <- sqrt(mean((pisa_train_m1$readingScore - pisa_train_m1$pred)^2))
 
+summary(m1)
+pisa_train %>% count(grade)
+(11*(29.542707)) - (9*(29.542707))
+
 pisa_test$pred <- predict(m1, pisa_test)
 pisa_test %>% summarize(diff = max(.$pred) - min(.$pred))
 pisa_test %>% summarize(sse = sum((.$readingScore - .$pred)^2))
 pisa_test_rmse <- sqrt(mean((pisa_test$readingScore - pisa_test$pred)^2))
-pisa_test %>% 
-        summarize(r2 = sum((.$pred - mean(.$readingScore))^2) / 
-                          sum((.$readingScore - mean(.$readingScore))^2))
 
-sum((pisa_test$readingScore - mean(pisa_test$readingScore))^2)
+mean(pisa_train$readingScore)
+mean(pisa_train_m1$pred)
 
+tss <- sum((pisa_test$readingScore - mean(pisa_train$readingScore))^2)
+rss <- sum((pisa_test$pred - pisa_test$readingScore)^2)
+1 - rss/tss
