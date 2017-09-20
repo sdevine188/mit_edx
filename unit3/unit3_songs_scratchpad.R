@@ -48,10 +48,11 @@ train2_corr <- cor(train2)
 train2_corr
 cor(train2$energy, train2$loudness)
 corrplot(train2_corr)
+train2 %>% select(loudness, energy) %>% ggpairs(.)
 # energy and loudness are highly correlated
 
 # remove loudness
-m2 <- glm(Top10 ~ . - loudness, data = train2, family = "binomial")
+m2 <- glm(Top10 ~ . -loudness, data = train2, family = "binomial")
 summary(m2)
 
 # remove energy
@@ -62,7 +63,7 @@ summary(m3)
 m3_predict <- predict(m3, newdata = test, type = "response")
 test$predict_m3 <- m3_predict
 test$predict_m3_dummy <- ifelse(test$predict_m3 > .45, 1, 0)
-confusionMatrix(test$predict_m3_dummy, test$Top10, positive = "1") # .8794
+confusionMatrix(test$predict_m3_dummy, reference = test$Top10, positive = "1") # .8794
 unique(test$predict_m3)
 
 # use rocr to see roc and accuracy curve based on threshold
@@ -101,7 +102,7 @@ test %>% filter(predict_m3_dummy == 1, Top10 == 0) %>% summarize(count = n()) # 
 # TP / TP + FN
 tp <- test %>% filter(predict_m3_dummy == 1, Top10 == 1) %>% summarize(count = n()) %>% .[1, 1]
 fn <- test %>% filter(predict_m3_dummy == 0, Top10 == 1) %>% summarize(count = n()) %>% .[1, 1]
-tp / (tp + fn) # .322, oddly confusionMatrix gets this value as specificity??
+tp / (tp + fn) # .322, 
 
 # calculate specificity
 # TN / (TN + FP)

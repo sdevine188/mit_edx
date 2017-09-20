@@ -13,6 +13,7 @@ setwd("C:/Users/Stephen/Desktop/R/mit_edx/unit3")
 list.files()
 
 parole <- data.frame(read_csv("parole.csv"))
+glimpse(parole)
 dim(parole)
 str(parole)
 head(parole)
@@ -27,6 +28,7 @@ table(parole$state)
 # convert crime and state to factors
 parole$crime <- factor(parole$crime)
 parole$state <- factor(parole$state)
+summary(parole)
 
 # create training and test set
 set.seed(144)
@@ -49,12 +51,15 @@ m1 <- glm(violator ~ ., data = train, family = "binomial")
 summary(m1)
 
 # interpret coefficient on multiple.offenses as odds
-exp(1.6119919)
+exp(1.6119919) # 5.012786
+5.012786 / (1 + 5.012786)
+
 
 # problem 4.3
 m1_logit <- -4.2411574 + 0.3869904 + 0.8867192 + -0.0001756*50 + -0.1238867*3 + 0.0802954*12 +  0.6837143
 odds <- exp(m1_logit)
-prob <- 1 / (1 + exp(-(m1_logit)))
+prob <- odds / (1 + odds)
+prob
 
 # predict m1 on test set
 test$m1_pred <- predict(m1, newdata = test, type = "response")
@@ -62,7 +67,7 @@ head(test)
 max(test$m1_pred)
 test$m1_pred_class <- ifelse(test$m1_pred > .5, 1, 0)
 head(test)
-confusionMatrix(test$m1_pred_class, test$violator, positive = "1")
+confusionMatrix(test$m1_pred_class, reference = test$violator, positive = "1")
 
 m1_pred <- prediction(test$m1_pred, test$violator)
 m1_plot <- performance(m1_pred, measure = "tpr", x.measure = "fpr")
@@ -80,3 +85,5 @@ auc@y.values
 # find baseline prediction
 table(test$violator)
 179 / (23 + 179)
+
+

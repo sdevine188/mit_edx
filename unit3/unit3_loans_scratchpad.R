@@ -50,6 +50,14 @@ loans_imp[7727, ]
 # re-add dependent variable to imputed data
 loans_imp$not.fully.paid <- loans$not.fully.paid 
 
+
+####################
+
+# load imputed data
+loans_imp <- read_csv("loans_imputed.csv")
+
+#######################
+
 # split data in train and test sets
 set.seed(144)
 in_train <- sample.split(loans_imp$not.fully.paid, SplitRatio = .7)
@@ -59,15 +67,20 @@ test <- loans_imp[!in_train, ]
 # model 1
 m1 <- glm(not.fully.paid ~ ., data = train, family = "binomial")
 summary(m1)
+names(m1)
+m1$coefficients
 
 # test of m1 fit
 # roc curve
 m1_predict <- predict(m1, newdata = test, type = "response")
 m1_predict_class <- ifelse(m1_predict > .5, 1, 0)
-confusionMatrix(m1_predict_class, test$not.fully.paid, positive = "1")
+confusionMatrix(m1_predict_class, reference = test$not.fully.paid, positive = "1")
 m1_prediction <- prediction(m1_predict, test$not.fully.paid)
 m1_plot_roc <- performance(m1_prediction, measure = "tpr", x.measure = "fpr")
 plot(m1_plot_roc, colorize = TRUE)
+
+# baseline model
+(2400 + 13) / (2400 + 13 + 457 + 3)
 
 # accuracy curve
 m1_plot_acc <- performance(m1_prediction, measure = "acc")
@@ -76,6 +89,13 @@ plot(m1_plot_acc)
 # auc
 m1_auc <- performance(m1_prediction, measure = "auc")
 m1_auc@y.values 
+
+# change in logit for 10 fico score
+logit_a <- -0.00931679*700
+logit_b <- -0.00931679*710
+odds_a <- exp(logit_a)
+odds_b <- exp(logit_b)
+odds_a / odds_b
 
 # model2 using just interest rate
 m2 <- glm(not.fully.paid ~ int.rate, data = train, family = "binomial")
@@ -90,6 +110,7 @@ m2_predict <- predict(m2, newdata = test, type = "response")
 m2_predict_class <- ifelse(m2_predict > .5, 1, 0)
 confusionMatrix(m2_predict_class, test$not.fully.paid, positive = "1")
 max(m2_predict)
+sum(m2_predict_class)
 test$m2.predict <- m2_predict
 
 # m2 roc curve
