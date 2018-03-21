@@ -47,13 +47,15 @@ stevens_train_m1_rpart <- rpart(Reverse ~ Circuit + Issue + Petitioner + Respond
 names(stevens_train_m1_rpart)
 stevens_train_m1_rpart
 prp(stevens_train_m1_rpart)
-fancyRpartPlot(stevens_train_m1_rpart)
+fancyRpartPlot(stevens_train_m1_rpart,)
+rpart.plot(stevens_train_m1_rpart)
 stevens_test_m1_rpart_pred <- predict(stevens_train_m1_rpart, newdata = stevens_test, type = "class")
 confusionMatrix(stevens_test_m1_rpart_pred, reference = stevens_test$Reverse)
 
 # caret performs better than rpart
 stevens_train_m1_caret <- train(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst,  
                           method = "rpart", data = stevens_train)
+stevens_train_m1_caret
 names(stevens_train_m1_caret)
 stevens_train_m1_caret$finalModel
 fancyRpartPlot(stevens_train_m1_caret$finalModel)
@@ -136,6 +138,27 @@ confusionMatrix(stevens_test_m1_rpart_pred, reference = stevens_test$Reverse)
 ############################################3
 
 
+# experiment with default rpart
+# build cart model with minbucket = 100
+stevens_train_m1_rpart <- rpart(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, data = stevens_train, 
+                                method = "class", control = rpart.control(cp = 0))
+stevens_train_m1_rpart
+attributes(stevens_train_m1_rpart)
+plot(stevens_train_m1_rpart)
+
+stevens_train_m1_rpart$cptable
+printcp(stevens_train_m1_rpart)
+plotcp(stevens_train_m1_rpart)
+# dev.off()
+
+stevens_test_m1_rpart_pred <- predict(stevens_train_m1_rpart, newdata = stevens_test, type = "class")
+confusionMatrix(stevens_test_m1_rpart_pred, reference = stevens_test$Reverse)
+
+
+############################################
+
+
+
 # build random forest using randomForest
 stevens_train_m2_rf <- randomForest(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, 
                                     data = stevens_train, nodesize = 25, ntree = 200)
@@ -167,31 +190,79 @@ confusionMatrix(stevens_test_m2_rf_pred, reference = stevens_test$Reverse)
 
 
 # use k-fold cross validation
-number_folds <- trainControl(method = "cv", number = 10)
-cp_grid <- expand.grid(.cp = seq(.01, .05, .01))
+number_folds <- trainControl(method = "cv", number = 10, repeats = 3)
+cp_grid <- expand.grid(.cp = seq(.01, .5, .01))
+cp_grid
 
 # without manual tuning across multiple complexity parameters (cp) and without 10-fold cv, 
 # without k-fold, it bootstraps by default, 
 # caret automatically tests different cp values on each bootstrap sample
-train(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, 
+stevens_train_m1_caret <- train(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, 
       data = stevens_train, method = "rpart")
+stevens_train_m1_caret
+stevens_train_m1_caret$finalModel
+attributes(stevens_train_m1_caret)
+attributes(stevens_train_m1_caret$finalModel)
+stevens_train_m1_caret$finalModel$splits
+stevens_train_m1_caret$finalModel$frame
+stevens_train_m1_caret$finalModel$cptable
+stevens_train_m1_caret$finalModel$tuneValue
+
+stevens_train_m1_caret$bestTune
+stevens_train_m1_caret$control
+stevens_train_m1_caret$results
+stevens_train_m1_caret$modelInfo
+plot(stevens_train_m1_caret)
+print(stevens_train_m1_caret)
+
+ggplot(stevens_train_m1_caret$results, aes(x = cp, y = Accuracy)) + geom_line() + geom_point()
+
+getTrainPerf(stevens_train_m1_caret)
+stevens_train_m1_caret$resample
+mean(stevens_train_m1_caret$resample$Accuracy)
+mean(stevens_train_m1_caret$resample$Kappa)
+
+
+row.names(stevens_train_m1_caret$finalModel$frame)
+stevens_train_m1_caret_terminal_nodes <- stevens_train_m1_caret$finalModel$frame %>% select(-yval2) %>% 
+        rownames_to_column() %>% filter(var == "<leaf>") %>% pull(rowname)
+stevens_train_m1_caret_terminal_nodes
+paths <- path.rpart(stevens_train_m1_caret$finalModel, node = stevens_train_m1_caret_terminal_nodes, pretty = 0)
+paths
+glimpse(paths)
 
 # without manual tuning across multiple complexity parameters (cp) but with 10-fold cv, 
 # caret automatically tests different cp values
-train(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, 
+stevens_train_m1_caret <- train(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, 
       data = stevens_train, method = "rpart", trControl = number_folds)
+stevens_train_m1_caret
+stevens_train_m1_caret$finalModel
+stevens_train_m1_caret$finalModel$cptable
 
-# with tuning across cp
-train(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, 
+
+# with just cp
+stevens_train_m1_caret <- train(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, 
+      data = stevens_train, method = "rpart", tuneGrid = cp_grid)
+stevens_train_m1_caret
+stevens_train_m1_caret$finalModel
+stevens_train_m1_caret$finalModel$cptable
+
+
+# with tuning across cp and cv
+stevens_train_m1_caret <- train(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, 
       data = stevens_train, method = "rpart", trControl = number_folds, tuneGrid = cp_grid)
+stevens_train_m1_caret
+stevens_train_m1_caret$finalModel
+stevens_train_m1_caret$finalModel$cptable
 
-names(stevens_train_m3)
-stevens_train_m3$xlevels
+
+stevens_test_m1_caret_pred <- predict(stevens_train_m1_caret, newdata = stevens_test, method = "rpart")
+confusionMatrix(stevens_test_m1_caret_pred, reference = stevens_test$Reverse)
 
 # then, we'll build a tree using the optimal cp value we got from k-fold cross validation, instead of minbucket parameter
-# i got cp = .022, but lecture got 0.18
+# i got cp = .022, but lecture got 0.18 - randomness in algorithm
 stevens_train_m3_rpart <- rpart(Reverse ~ Circuit + Issue + Petitioner + Respondent + LowerCourt + Unconst, 
-                               data = stevens_train, method = "class", cp = .18)
+                               data = stevens_train, method = "class", cp = .2)
 stevens_train_m3_rpart 
 names(stevens_train_m3_rpart)
 stevens_train_m3_rpart$variable.importance
@@ -206,6 +277,94 @@ confusionMatrix(stevens_test_m3_rpart_pred, reference = stevens_test$Reverse)
 
 prp(stevens_train_m3_rpart)
 fancyRpartPlot(stevens_train_m1_rpart)
+
+
+####################################
+
+
+# test to see if dummy variables makes a difference
+# result: no difference here when using dummies or not
+
+# with tuning across cp and cv
+glimpse(stevens)
+stevens %>% distinct(Issue)
+
+stevens_subset <- stevens %>% select(-Docket)
+glimpse(stevens_subset)
+stevens_dummy <- dummyVars(~ ., data = stevens_subset)
+stevens_dummy <- data.frame(predict(stevens_dummy, newdata = stevens))
+glimpse(stevens_dummy)
+stevens_dummy <- stevens_dummy %>% mutate(Reverse.1 = factor(Reverse.1))
+str(stevens_dummy$Reverse.1)
+stevens_dummy$Reverse.1 <- fct_relevel(stevens_dummy$Reverse.1, "1", "0")
+str(stevens_dummy$Reverse.1)
+
+# create trainng and test data
+set.seed(3000)
+in_train <- sample.split(stevens_dummy$Reverse.1, SplitRatio = .7)
+stevens_train_dummy <- subset(stevens_dummy, in_train == TRUE)
+stevens_test_dummy <- subset(stevens_dummy, in_train == FALSE)
+
+
+stevens_train_m4_caret <- train(factor(Reverse.1) ~ . -Reverse.1 -Reverse.0, 
+                                data = stevens_train_dummy, method = "rpart", trControl = number_folds, tuneGrid = cp_grid)
+stevens_train_m4_caret
+stevens_train_m4_caret$finalModel
+stevens_train_m4_caret$finalModel$cptable
+
+stevens_test_m4_caret_pred <- predict(stevens_train_m4_caret, newdata = stevens_test_dummy, method = "rpart")
+confusionMatrix(stevens_test_m4_caret_pred, reference = stevens_test_dummy$Reverse.1)
+
+
+#########################################
+
+
+# test to see if preprocessing with center/scale makes a difference
+# result: preprocessing on dummies had no effect on accuracy, but you do lose interpretability of splits
+
+# inspect preprocess transformations
+
+# center subtracts the mean
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(stevens_train_dummy, method = c("center"))
+# transform the dataset using the parameters
+stevens_train_dummy_transformed <- predict(preprocessParams, newdata = stevens_train_dummy)
+head(stevens_train_dummy_transformed$LowerCourt.conser)
+head(stevens_train_dummy$LowerCourt.conser)
+mean(stevens_train_dummy$LowerCourt.conser)
+
+# scale divides by the sd
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(stevens_train_dummy, method = c("scale"))
+# transform the dataset using the parameters
+stevens_train_dummy_transformed <- predict(preprocessParams, newdata = stevens_train_dummy)
+head(stevens_train_dummy_transformed$LowerCourt.conser)
+head(stevens_train_dummy$LowerCourt.conser)
+sd(stevens_train_dummy$LowerCourt.conser)
+1/0.4995523
+
+# center and scale 
+# calculate the pre-process parameters from the dataset
+preprocessParams <- preProcess(stevens_train_dummy, method = c("center", "scale"))
+# transform the dataset using the parameters
+stevens_train_dummy_transformed <- predict(preprocessParams, newdata = stevens_train_dummy)
+head(stevens_train_dummy_transformed$LowerCourt.conser)
+head(stevens_train_dummy$LowerCourt.conser)
+sd(stevens_train_dummy$LowerCourt.conser)
+mean(stevens_train_dummy$LowerCourt.conser)
+(0 - 0.5328283) / 0.4995523
+(1 - 0.5328283) / 0.4995523
+
+
+stevens_train_m5_caret <- train(factor(Reverse.1) ~ . -Reverse.1 -Reverse.0, 
+                                data = stevens_train_dummy, method = "rpart", trControl = number_folds, 
+                                tuneGrid = cp_grid, preProcess = c("center", "scale"))
+stevens_train_m5_caret
+stevens_train_m5_caret$finalModel
+
+stevens_test_m5_caret_pred <- predict(stevens_train_m5_caret, newdata = stevens_test_dummy, method = "rpart")
+confusionMatrix(stevens_test_m5_caret_pred, reference = stevens_test_dummy$Reverse.1)
+
 
 
 #######################################################
